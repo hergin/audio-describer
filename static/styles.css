@@ -93,27 +93,61 @@ h2 {
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(480px, 1fr) 400px;
   gap: 20px;
   padding: 20px 24px;
+  align-items: start;
 }
 
-.preview-panel,
+.media-panel,
+.side-panel,
 .cue-panel,
-.log-panel {
+.job-card {
   background: #ffffff;
   border: 1px solid #d8e0e8;
   border-radius: 8px;
 }
 
-.preview-panel {
+.media-panel {
   padding: 16px;
   min-width: 0;
+}
+
+.panel-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 4px;
+  background: #eef2f6;
+  border-radius: 8px;
+}
+
+.tab-button {
+  min-height: 32px;
+  border-color: transparent;
+  background: transparent;
+  color: #374151;
+  padding: 0 14px;
+}
+
+.tab-button.active {
+  background: #ffffff;
+  border-color: #d8e0e8;
+  color: #111827;
+}
+
+.media-view {
+  display: none;
+}
+
+.media-view.active {
+  display: block;
 }
 
 video {
   width: 100%;
   aspect-ratio: 16 / 9;
+  max-height: 54vh;
   background: #101820;
   display: block;
 }
@@ -157,9 +191,51 @@ video {
   color: #374151;
 }
 
+.side-panel {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  min-width: 0;
+}
+
+.job-card,
 .cue-panel {
   padding: 16px;
-  min-width: 0;
+}
+
+.job-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#jobBadge {
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 9px;
+  text-transform: capitalize;
+}
+
+#jobBadge.running {
+  background: #fff4d6;
+  color: #7a4f00;
+}
+
+#jobBadge.done {
+  background: #ddfbe6;
+  color: #116329;
+}
+
+#jobBadge.failed {
+  background: #ffe1e1;
+  color: #b42318;
 }
 
 .cue-panel-head {
@@ -221,6 +297,8 @@ textarea {
   display: grid;
   gap: 10px;
   margin-top: 16px;
+  max-height: 42vh;
+  overflow: auto;
 }
 
 .cue-item {
@@ -255,24 +333,20 @@ textarea {
   padding: 0 10px;
 }
 
-.log-panel,
-.output-panel {
-  margin: 0 24px 20px;
-  padding: 14px 16px;
+.empty-output {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  border: 1px dashed #c9d2dc;
+  border-radius: 8px;
+  color: #5c6773;
+  background: #fbfcfe;
 }
 
-.output-head {
+.output-actions {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.output-panel video {
-  width: 100%;
-  max-height: 72vh;
-  background: #101820;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 .hidden {
@@ -303,13 +377,7 @@ textarea {
     padding: 14px;
   }
 
-  .log-panel,
-  .output-panel {
-    margin: 0 14px 14px;
-  }
-
-  .output-head {
-    align-items: stretch;
-    flex-direction: column;
+  .cue-list {
+    max-height: none;
   }
 }

@@ -11,10 +11,15 @@ const cueList = document.querySelector("#cueList");
 const renderButton = document.querySelector("#renderButton");
 const exportButton = document.querySelector("#exportButton");
 const downloadLink = document.querySelector("#downloadLink");
-const outputPanel = document.querySelector("#outputPanel");
 const outputVideo = document.querySelector("#outputVideo");
+const outputEmpty = document.querySelector("#outputEmpty");
+const sourceTab = document.querySelector("#sourceTab");
+const outputTab = document.querySelector("#outputTab");
+const sourceView = document.querySelector("#sourceView");
+const outputView = document.querySelector("#outputView");
 const statusText = document.querySelector("#statusText");
 const jobLog = document.querySelector("#jobLog");
+const jobBadge = document.querySelector("#jobBadge");
 
 let cues = [];
 let editingCueId = null;
@@ -42,6 +47,14 @@ async function fetchJson(url, options = {}) {
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function setActiveView(viewName) {
+  const showOutput = viewName === "output";
+  sourceTab.classList.toggle("active", !showOutput);
+  outputTab.classList.toggle("active", showOutput);
+  sourceView.classList.toggle("active", !showOutput);
+  outputView.classList.toggle("active", showOutput);
 }
 
 function updateTimeReadout() {
@@ -165,6 +178,8 @@ async function refreshState() {
   const state = await fetchJson("/api/state");
   setStatus(state.message || "Ready");
   jobLog.textContent = (state.logs || []).join("\n");
+  jobBadge.textContent = state.status || "idle";
+  jobBadge.className = state.status || "idle";
   renderButton.disabled = state.status === "running";
 
   if (state.hasVideo && !video.src) {
@@ -172,14 +187,24 @@ async function refreshState() {
   }
 
   if (state.hasOutput) {
-    outputPanel.classList.remove("hidden");
-    if (!outputVideo.src || state.status === "done") {
+    outputTab.disabled = false;
+    outputEmpty.classList.add("hidden");
+    outputVideo.classList.remove("hidden");
+    downloadLink.classList.remove("hidden");
+    if (!outputVideo.src) {
       outputVideo.src = `/api/output-video?cache=${Date.now()}`;
     }
+    if (state.status === "done") {
+      setActiveView("output");
+    }
   } else {
-    outputPanel.classList.add("hidden");
+    outputTab.disabled = true;
+    outputEmpty.classList.remove("hidden");
+    outputVideo.classList.add("hidden");
+    downloadLink.classList.add("hidden");
     outputVideo.removeAttribute("src");
     outputVideo.load();
+    setActiveView("source");
   }
 
   if (state.status === "running" && !pollTimer) {
@@ -209,9 +234,15 @@ videoInput.addEventListener("change", async () => {
     cues = [];
     renderCueList();
     await refreshState();
+    setActiveView("source");
   } catch (error) {
     setStatus(error.message);
   }
+});
+
+sourceTab.addEventListener("click", () => setActiveView("source"));
+outputTab.addEventListener("click", () => {
+  if (!outputTab.disabled) setActiveView("output");
 });
 
 video.addEventListener("loadedmetadata", () => {
@@ -272,6 +303,7 @@ renderButton.addEventListener("click", async () => {
   try {
     await saveCues();
     await fetchJson("/api/render", { method: "POST" });
+    setActiveView("source");
     await refreshState();
   } catch (error) {
     setStatus(error.message);

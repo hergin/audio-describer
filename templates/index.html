@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Audio Description Builder</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Audio Description Builder</h1>
+          <p id="statusText">Ready</p>
+        </div>
+        <div class="actions">
+          <label class="file-picker">
+            <input id="videoInput" type="file" accept="video/*">
+            Select video
+          </label>
+          <button id="renderButton" type="button">Render MP4</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="preview-panel">
+          <video id="video" controls preload="metadata"></video>
+          <div class="timeline-wrap">
+            <input id="timeline" type="range" min="0" max="0" step="0.001" value="0">
+            <div id="markers" class="markers"></div>
+          </div>
+          <div class="transport">
+            <span id="timeReadout">00:00:00.000 / 00:00:00.000</span>
+            <button id="addCueButton" type="button">Add AD at current time</button>
+          </div>
+        </div>
+
+        <aside class="cue-panel">
+          <div class="cue-panel-head">
+            <h2>Audio descriptions</h2>
+            <button id="exportButton" type="button" class="secondary">Export VTT</button>
+          </div>
+          <form id="cueForm" class="cue-form">
+            <div class="current-cue-time">
+              <span>Current time</span>
+              <strong id="cueStart">00:00:00.000</strong>
+            </div>
+            <label>
+              Text
+              <textarea id="cueText" rows="4"></textarea>
+            </label>
+            <button type="submit">Save cue</button>
+          </form>
+          <div id="cueList" class="cue-list"></div>
+        </aside>
+      </section>
+
+      <section class="log-panel">
+        <h2>Job log</h2>
+        <pre id="jobLog"></pre>
+      </section>
+
+      <section id="outputPanel" class="output-panel hidden">
+        <div class="output-head">
+          <h2>Rendered output</h2>
+          <a id="downloadLink" class="button secondary" href="/api/download">Download MP4</a>
+        </div>
+        <video id="outputVideo" controls preload="metadata"></video>
+      </section>
+    </main>
+
+    <script src="/static/app.js?v=3"></script>
+  </body>
+</html>

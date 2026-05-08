@@ -55,6 +55,22 @@ To keep intermediate files for troubleshooting:
 python build_audio_described_video.py --keep-temp
 ```
 
+## Run The Local GUI
+
+With the virtual environment activated:
+
+```powershell
+python app.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The GUI lets you select a video, preview it, add audio-description cues at the current playback time, export those cues as WebVTT, and render the final described MP4. Uploaded videos, cue data, and completed GUI outputs are stored under `_gui_workspace`.
+
 ## Notes
 
 - Keep the terminal open while the script runs; generating TTS and re-encoding 1080p video can take a while.

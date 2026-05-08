@@ -1,4 +1,5 @@
 import json
+import shutil
 import threading
 import traceback
 from dataclasses import dataclass, field
@@ -80,10 +81,15 @@ def write_vtt(cues: list[dict], path: Path) -> None:
 
 def public_state() -> dict:
     with state.lock:
+        has_output = (
+            state.status == "done"
+            and state.output_path is not None
+            and state.output_path.exists()
+        )
         return {
             "videoName": state.video_name,
             "hasVideo": state.video_path is not None and state.video_path.exists(),
-            "hasOutput": state.output_path is not None and state.output_path.exists(),
+            "hasOutput": has_output,
             "jobId": state.job_id,
             "status": state.status,
             "message": state.message,
@@ -98,6 +104,17 @@ def set_job_status(status: str, message: str) -> None:
         state.logs.append(message)
 
 
+def reset_state() -> None:
+    with state.lock:
+        state.video_path = None
+        state.video_name = None
+        state.output_path = None
+        state.job_id = None
+        state.status = "idle"
+        state.message = "Ready"
+        state.logs = []
+
+
 @app.get("/")
 def index():
     ensure_workspace()
@@ -106,6 +123,18 @@ def index():
 
 @app.get("/api/state")
 def api_state():
+    return jsonify(public_state())
+
+
+@app.post("/api/clear")
+def api_clear():
+    with state.lock:
+        if state.status == "running":
+            return jsonify({"error": "Cannot clear while a render job is running."}), 409
+
+    shutil.rmtree(GUI_WORKSPACE, ignore_errors=True)
+    ensure_workspace()
+    reset_state()
     return jsonify(public_state())
 
 
@@ -200,6 +229,7 @@ def api_render():
 
     write_vtt(cues, VTT_PATH)
     output_path = OUTPUT_DIR / f"{video_path.stem}-audio-described.mp4"
+    output_path.unlink(missing_ok=True)
     job_id = str(uuid4())
 
     with state.lock:

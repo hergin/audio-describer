@@ -9,6 +9,7 @@ const cueStart = document.querySelector("#cueStart");
 const cueText = document.querySelector("#cueText");
 const cueList = document.querySelector("#cueList");
 const renderButton = document.querySelector("#renderButton");
+const clearButton = document.querySelector("#clearButton");
 const exportButton = document.querySelector("#exportButton");
 const downloadLink = document.querySelector("#downloadLink");
 const outputVideo = document.querySelector("#outputVideo");
@@ -25,6 +26,7 @@ let cues = [];
 let editingCueId = null;
 let pollTimer = null;
 let videoClockTimer = null;
+let loadedOutputJobId = null;
 
 function formatTime(seconds) {
   const safeSeconds = Math.max(0, Number(seconds) || 0);
@@ -181,29 +183,42 @@ async function refreshState() {
   jobBadge.textContent = state.status || "idle";
   jobBadge.className = state.status || "idle";
   renderButton.disabled = state.status === "running";
+  clearButton.disabled = state.status === "running";
 
   if (state.hasVideo && !video.src) {
     video.src = `/api/video?cache=${Date.now()}`;
   }
 
-  if (state.hasOutput) {
+  if (!state.hasVideo && video.src) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    timeline.value = "0";
+    timeline.max = "0";
+    updateTimeReadout();
+  }
+
+  if (state.status === "done" && state.hasOutput) {
     outputTab.disabled = false;
     outputEmpty.classList.add("hidden");
     outputVideo.classList.remove("hidden");
     downloadLink.classList.remove("hidden");
-    if (!outputVideo.src) {
+    if (loadedOutputJobId !== state.jobId) {
       outputVideo.src = `/api/output-video?cache=${Date.now()}`;
+      loadedOutputJobId = state.jobId;
     }
-    if (state.status === "done") {
-      setActiveView("output");
-    }
+    setActiveView("output");
   } else {
     outputTab.disabled = true;
     outputEmpty.classList.remove("hidden");
     outputVideo.classList.add("hidden");
     downloadLink.classList.add("hidden");
-    outputVideo.removeAttribute("src");
-    outputVideo.load();
+    if (outputVideo.src) {
+      outputVideo.pause();
+      outputVideo.removeAttribute("src");
+      outputVideo.load();
+    }
+    loadedOutputJobId = null;
     setActiveView("source");
   }
 
@@ -303,6 +318,21 @@ renderButton.addEventListener("click", async () => {
   try {
     await saveCues();
     await fetchJson("/api/render", { method: "POST" });
+    setActiveView("source");
+    await refreshState();
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
+clearButton.addEventListener("click", async () => {
+  try {
+    await fetchJson("/api/clear", { method: "POST" });
+    cues = [];
+    editingCueId = null;
+    cueText.value = "";
+    videoInput.value = "";
+    renderCueList();
     setActiveView("source");
     await refreshState();
   } catch (error) {

@@ -1,0 +1,28 @@
+WEBVTT
+
+1
+00:00:30.286 --> 00:02:12.522
+COURSE LEARNING OBJECTIVES
+ • Demonstrate techniques for eliciting and clarifying
+ vague requirements from a client partner
+ • Analyze client requirements and produce clear,
+ refined requirement specifications
+ • Select the most appropriate software development
+ methodology with respect to the size of the project
+ and needs of the client partner.  • Apply object-oriented design principles,
+ design patterns, and the model-view-
+ controller architecture
+ • Design the project in the form of
+ documents, UML diagrams, sketches,
+ prototypes, drawings  • Implement the project under the change
+ requests from the client partner
+ • Verify and validate the project whether it
+ solves the client partner's problem 
+• Develop a comprehensive, sustainable
+ maintenance plan including
+ documentation, version control strategies,
+ and update procedures
+
+2
+00:01:44.624 --> 00:02:12.522
+Fine they said.

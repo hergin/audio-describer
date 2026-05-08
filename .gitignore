@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+*.mp4
+
+# Local environment files
+.env
+.env.*
+
+# Build artifacts from this script
+_ad_build/
+*.concat.txt
+
+# Generated media outputs
+*-audio-described.mp4
+output.mp4
+
+# Editor/system files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

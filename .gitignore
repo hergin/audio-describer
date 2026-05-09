@@ -19,6 +19,7 @@ _ad_build/
 _gui_workspace/
 _ad_mix_build/
 _ad_track_build/
+_smart_ad_build/
 *.concat.txt
 
 # Generated media outputs

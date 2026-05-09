@@ -21,6 +21,7 @@ const outputView = document.querySelector("#outputView");
 const statusText = document.querySelector("#statusText");
 const jobLog = document.querySelector("#jobLog");
 const jobBadge = document.querySelector("#jobBadge");
+const renderModeInputs = document.querySelectorAll("input[name='renderMode']");
 
 let cues = [];
 let editingCueId = null;
@@ -184,6 +185,9 @@ async function refreshState() {
   jobBadge.className = state.status || "idle";
   renderButton.disabled = state.status === "running";
   clearButton.disabled = state.status === "running";
+  renderModeInputs.forEach((input) => {
+    input.disabled = state.status === "running";
+  });
 
   if (state.hasVideo && !video.src) {
     video.src = `/api/video?cache=${Date.now()}`;
@@ -317,7 +321,12 @@ cueForm.addEventListener("submit", async (event) => {
 renderButton.addEventListener("click", async () => {
   try {
     await saveCues();
-    await fetchJson("/api/render", { method: "POST" });
+    const selectedMode = document.querySelector("input[name='renderMode']:checked").value;
+    await fetchJson("/api/render", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: selectedMode }),
+    });
     setActiveView("source");
     await refreshState();
   } catch (error) {

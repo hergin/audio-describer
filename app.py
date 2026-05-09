@@ -14,6 +14,7 @@ from build_audio_described_video import (
     build_video,
     seconds_to_timestamp,
 )
+from mix_ad_into_original_audio import build_mixed_ad_video
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -215,6 +216,11 @@ def api_export_vtt():
 
 @app.post("/api/render")
 def api_render():
+    payload = request.get_json(silent=True) or {}
+    render_mode = payload.get("mode", "extended")
+    if render_mode not in {"extended", "mixed"}:
+        return jsonify({"error": "Choose either extended or mixed AD output."}), 400
+
     with state.lock:
         if state.status == "running":
             return jsonify({"error": "A render job is already running."}), 409
@@ -228,37 +234,54 @@ def api_render():
         return jsonify({"error": "Add at least one audio description cue."}), 400
 
     write_vtt(cues, VTT_PATH)
-    output_path = OUTPUT_DIR / f"{video_path.stem}-audio-described.mp4"
+    output_suffix = "extended-ad" if render_mode == "extended" else "mixed-ad"
+    output_path = OUTPUT_DIR / f"{video_path.stem}-{output_suffix}.mp4"
     output_path.unlink(missing_ok=True)
     job_id = str(uuid4())
 
     with state.lock:
         state.job_id = job_id
         state.status = "running"
-        state.message = "Render started"
+        state.message = "Extended AD render started" if render_mode == "extended" else "Mixed AD render started"
         state.output_path = output_path
-        state.logs = ["Render started"]
+        state.logs = [state.message]
 
     thread = threading.Thread(
         target=render_worker,
-        args=(job_id, video_path, VTT_PATH, output_path),
+        args=(job_id, render_mode, video_path, VTT_PATH, output_path),
         daemon=True,
     )
     thread.start()
     return jsonify(public_state())
 
 
-def render_worker(job_id: str, video_path: Path, vtt_path: Path, output_path: Path) -> None:
+def render_worker(
+    job_id: str,
+    render_mode: str,
+    video_path: Path,
+    vtt_path: Path,
+    output_path: Path,
+) -> None:
     try:
-        set_job_status("running", "Generating TTS and rendering video")
-        build_video(
-            video_path=video_path,
-            vtt_path=vtt_path,
-            output_path=output_path,
-            work_dir=GUI_WORKSPACE / f"render_{job_id}",
-            bitrate_kbps=None,
-            keep_temp=False,
-        )
+        if render_mode == "mixed":
+            set_job_status("running", "Generating TTS and mixing AD into original audio")
+            build_mixed_ad_video(
+                video_path=video_path,
+                vtt_path=vtt_path,
+                output_path=output_path,
+                work_dir=GUI_WORKSPACE / f"render_{job_id}",
+                keep_temp=False,
+            )
+        else:
+            set_job_status("running", "Generating TTS and rendering extended AD video")
+            build_video(
+                video_path=video_path,
+                vtt_path=vtt_path,
+                output_path=output_path,
+                work_dir=GUI_WORKSPACE / f"render_{job_id}",
+                bitrate_kbps=None,
+                keep_temp=False,
+            )
         set_job_status("done", "Render complete")
     except UserFacingError as exc:
         set_job_status("failed", str(exc))

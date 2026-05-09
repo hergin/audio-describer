@@ -59,6 +59,21 @@
               <h2>Render job</h2>
               <span id="jobBadge">Idle</span>
             </div>
+            <div class="render-mode">
+              <span>Output mode</span>
+              <div class="mode-options">
+                <label>
+                  <input type="radio" name="renderMode" value="extended" checked>
+                  <strong>Extended AD</strong>
+                  <small>Pauses the video for descriptions</small>
+                </label>
+                <label>
+                  <input type="radio" name="renderMode" value="mixed">
+                  <strong>Mixed AD</strong>
+                  <small>Keeps length, lowers original audio</small>
+                </label>
+              </div>
+            </div>
             <pre id="jobLog"></pre>
           </section>
 
@@ -84,6 +99,6 @@
       </section>
     </main>
 
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/app.js?v=7"></script>
   </body>
 </html>

@@ -17,6 +17,8 @@ env/
 # Build artifacts from this script
 _ad_build/
 _gui_workspace/
+_ad_mix_build/
+_ad_track_build/
 *.concat.txt
 
 # Generated media outputs

@@ -47,6 +47,7 @@ class CuePlan:
     ad_duration: float
     continue_duration: float
     pause_duration: float
+    requested_start: float
 
 
 def run_ffmpeg(args: list[str]) -> subprocess.CompletedProcess:
@@ -113,6 +114,21 @@ def silence_available_from(cue_start: float, spans: list[SilenceSpan], source_du
         if span.start <= cue_start < span.end:
             return max(0.0, min(span.end, source_duration) - cue_start)
     return 0.0
+
+
+def choose_start_within_current_silence(
+    requested_start: float,
+    ad_duration: float,
+    spans: list[SilenceSpan],
+    source_duration: float,
+) -> tuple[float, float]:
+    for span in spans:
+        if span.start <= requested_start < span.end:
+            silence_end = min(span.end, source_duration)
+            latest_start_that_fits = silence_end - ad_duration
+            cue_start = max(span.start, min(requested_start, latest_start_that_fits))
+            return cue_start, max(0.0, silence_end - cue_start)
+    return requested_start, 0.0
 
 
 def make_continue_with_ad_segment(
@@ -204,6 +220,68 @@ def make_pause_overflow_segment(
     )
 
 
+def build_duck_volume_expression(plans: list[CuePlan]) -> str:
+    expression = "1"
+    for plan in plans:
+        start = plan.cue_start
+        end = plan.cue_start + plan.ad_duration
+        expression = f"if(between(t,{start:.3f},{end:.3f}),{DUCK_VOLUME},{expression})"
+    return expression
+
+
+def make_no_pause_smart_output(
+    video_path: Path,
+    plans: list[CuePlan],
+    output_path: Path,
+    source_duration: float,
+) -> None:
+    args = ["-y", "-i", str(video_path)]
+    for plan in plans:
+        args.extend(["-i", str(plan.cue_audio_path)])
+
+    filter_parts = [
+        (
+            "[0:a:0]aresample=48000,"
+            "aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            f"volume='{build_duck_volume_expression(plans)}':eval=frame[orig]"
+        )
+    ]
+
+    mix_inputs = ["[orig]"]
+    for index, plan in enumerate(plans, start=1):
+        delay_ms = max(0, round(plan.cue_start * 1000))
+        label = f"ad{index}"
+        filter_parts.append(
+            f"[{index}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            f"adelay={delay_ms}|{delay_ms},atrim=0:{source_duration:.6f}[{label}]"
+        )
+        mix_inputs.append(f"[{label}]")
+
+    filter_parts.append(
+        f"{''.join(mix_inputs)}amix=inputs={len(mix_inputs)}:duration=first:dropout_transition=0,"
+        "alimiter=limit=0.95[mixed]"
+    )
+
+    run_ffmpeg(
+        [
+            *args,
+            "-filter_complex",
+            ";".join(filter_parts),
+            "-map",
+            "0:v:0",
+            "-map",
+            "[mixed]",
+            "-c:v",
+            "copy",
+            *audio_encode_args(),
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+    )
+
+
 def build_smart_ad_video(
     video_path: Path,
     vtt_path: Path,
@@ -249,26 +327,42 @@ def build_smart_ad_video(
             cue_audio_path = audio_dir / f"cue_{cue.index:03d}.m4a"
             encode_mp3_to_segment_audio(mp3_path, cue_audio_path)
             ad_duration = media_duration(cue_audio_path)
-            available_silence = silence_available_from(cue.start, spans, source_duration)
-            continue_duration = min(ad_duration, available_silence, max(0.0, source_duration - cue.start))
+            cue_start, available_silence = choose_start_within_current_silence(
+                cue.start,
+                ad_duration,
+                spans,
+                source_duration,
+            )
+            continue_duration = min(ad_duration, available_silence, max(0.0, source_duration - cue_start))
             pause_duration = max(0.0, ad_duration - continue_duration)
             plans.append(
                 CuePlan(
                     cue_index=cue.index,
-                    cue_start=cue.start,
+                    cue_start=cue_start,
                     cue_audio_path=cue_audio_path,
                     ad_duration=ad_duration,
                     continue_duration=continue_duration,
                     pause_duration=pause_duration,
+                    requested_start=cue.start,
                 )
             )
             print(
-                f"Cue {cue.index}: AD {ad_duration:.3f}s, silence {available_silence:.3f}s, "
-                f"pause {pause_duration:.3f}s"
+                f"Cue {cue.index}: requested {cue.start:.3f}s, placed {cue_start:.3f}s, "
+                f"AD {ad_duration:.3f}s, silence {available_silence:.3f}s, pause {pause_duration:.3f}s"
             )
 
         segment_paths: list[Path] = []
         previous_source_time = 0.0
+
+        if plans and all(plan.pause_duration <= 0.001 for plan in plans):
+            print("No pause needed; copying video stream and mixing AD into the original audio.")
+            make_no_pause_smart_output(video_path, plans, output_path, source_duration)
+            output_duration = media_duration(output_path)
+            print(f"Done: {output_path}")
+            print(f"Source duration: {source_duration:.3f}s")
+            print(f"Output duration: {output_duration:.3f}s")
+            print(f"Added duration: {output_duration - source_duration:.3f}s")
+            return
 
         for plan in plans:
             if plan.cue_start < previous_source_time:

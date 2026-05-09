@@ -14,6 +14,7 @@ from build_audio_described_video import (
     build_video,
     seconds_to_timestamp,
 )
+from build_nearby_silence_ad_video import build_nearby_silence_ad_video
 from build_smart_ad_video import build_smart_ad_video
 from mix_ad_into_original_audio import build_mixed_ad_video
 
@@ -219,8 +220,18 @@ def api_export_vtt():
 def api_render():
     payload = request.get_json(silent=True) or {}
     render_mode = payload.get("mode", "extended")
-    if render_mode not in {"extended", "mixed", "smart"}:
-        return jsonify({"error": "Choose extended, mixed, or smart AD output."}), 400
+    if render_mode not in {"extended", "mixed", "smart", "nearby"}:
+        return jsonify({"error": "Choose extended, mixed, smart, or nearby AD output."}), 400
+    search_before = 2.0
+    search_after = 4.0
+    if render_mode == "nearby":
+        try:
+            search_before = float(payload.get("searchBefore", search_before))
+            search_after = float(payload.get("searchAfter", search_after))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Nearby AD search window values must be numbers."}), 400
+        if search_before < 0 or search_after < 0:
+            return jsonify({"error": "Nearby AD search window values cannot be negative."}), 400
 
     with state.lock:
         if state.status == "running":
@@ -239,11 +250,13 @@ def api_render():
         "extended": "extended-ad",
         "mixed": "mixed-ad",
         "smart": "smart-ad",
+        "nearby": "nearby-ad",
     }
     status_messages = {
         "extended": "Extended AD render started",
         "mixed": "Mixed AD render started",
         "smart": "Smart AD render started",
+        "nearby": "Nearby AD render started",
     }
     output_suffix = output_suffixes[render_mode]
     output_path = OUTPUT_DIR / f"{video_path.stem}-{output_suffix}.mp4"
@@ -259,7 +272,7 @@ def api_render():
 
     thread = threading.Thread(
         target=render_worker,
-        args=(job_id, render_mode, video_path, VTT_PATH, output_path),
+        args=(job_id, render_mode, video_path, VTT_PATH, output_path, search_before, search_after),
         daemon=True,
     )
     thread.start()
@@ -272,6 +285,8 @@ def render_worker(
     video_path: Path,
     vtt_path: Path,
     output_path: Path,
+    search_before: float,
+    search_after: float,
 ) -> None:
     try:
         if render_mode == "mixed":
@@ -292,6 +307,18 @@ def render_worker(
                 work_dir=GUI_WORKSPACE / f"render_{job_id}",
                 bitrate_kbps=None,
                 keep_temp=False,
+            )
+        elif render_mode == "nearby":
+            set_job_status("running", "Searching nearby quiet gaps and rendering AD video")
+            build_nearby_silence_ad_video(
+                video_path=video_path,
+                vtt_path=vtt_path,
+                output_path=output_path,
+                work_dir=GUI_WORKSPACE / f"render_{job_id}",
+                bitrate_kbps=None,
+                keep_temp=False,
+                search_before=search_before,
+                search_after=search_after,
             )
         else:
             set_job_status("running", "Generating TTS and rendering extended AD video")

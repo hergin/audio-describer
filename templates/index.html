@@ -63,7 +63,7 @@
               <span>Output mode</span>
               <div class="mode-options">
                 <label>
-                  <input type="radio" name="renderMode" value="extended" checked>
+                  <input type="radio" name="renderMode" value="extended">
                   <strong>Extended AD</strong>
                   <small>Pauses the video for descriptions</small>
                 </label>
@@ -73,11 +73,26 @@
                   <small>Keeps length, lowers original audio</small>
                 </label>
                 <label>
-                  <input type="radio" name="renderMode" value="smart">
+                  <input type="radio" name="renderMode" value="smart" checked>
                   <strong>Smart AD</strong>
                   <small>Uses silence first, pauses overflow</small>
                 </label>
+                <label>
+                  <input type="radio" name="renderMode" value="nearby">
+                  <strong>Nearby AD</strong>
+                  <small>Moves to nearby quiet gaps</small>
+                </label>
               </div>
+            </div>
+            <div id="nearbySettings" class="nearby-settings">
+              <label>
+                Search before
+                <input id="searchBefore" type="number" min="0" step="0.25" value="2">
+              </label>
+              <label>
+                Search after
+                <input id="searchAfter" type="number" min="0" step="0.25" value="4">
+              </label>
             </div>
             <pre id="jobLog"></pre>
           </section>
@@ -104,6 +119,6 @@
       </section>
     </main>
 
-    <script src="/static/app.js?v=8"></script>
+    <script src="/static/app.js?v=11"></script>
   </body>
 </html>

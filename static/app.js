@@ -22,6 +22,9 @@ const statusText = document.querySelector("#statusText");
 const jobLog = document.querySelector("#jobLog");
 const jobBadge = document.querySelector("#jobBadge");
 const renderModeInputs = document.querySelectorAll("input[name='renderMode']");
+const nearbySettings = document.querySelector("#nearbySettings");
+const searchBefore = document.querySelector("#searchBefore");
+const searchAfter = document.querySelector("#searchAfter");
 
 let cues = [];
 let editingCueId = null;
@@ -58,6 +61,14 @@ function setActiveView(viewName) {
   outputTab.classList.toggle("active", showOutput);
   sourceView.classList.toggle("active", !showOutput);
   outputView.classList.toggle("active", showOutput);
+}
+
+function updateNearbySettingsState() {
+  const selectedMode = document.querySelector("input[name='renderMode']:checked").value;
+  const isNearby = selectedMode === "nearby";
+  nearbySettings.classList.toggle("hidden", !isNearby);
+  searchBefore.disabled = !isNearby;
+  searchAfter.disabled = !isNearby;
 }
 
 function updateTimeReadout() {
@@ -188,6 +199,7 @@ async function refreshState() {
   renderModeInputs.forEach((input) => {
     input.disabled = state.status === "running";
   });
+  updateNearbySettingsState();
 
   if (state.hasVideo && !video.src) {
     video.src = `/api/video?cache=${Date.now()}`;
@@ -264,6 +276,10 @@ outputTab.addEventListener("click", () => {
   if (!outputTab.disabled) setActiveView("output");
 });
 
+renderModeInputs.forEach((input) => {
+  input.addEventListener("change", updateNearbySettingsState);
+});
+
 video.addEventListener("loadedmetadata", () => {
   timeline.max = String(video.duration || 0);
   updateTimeReadout();
@@ -322,10 +338,15 @@ renderButton.addEventListener("click", async () => {
   try {
     await saveCues();
     const selectedMode = document.querySelector("input[name='renderMode']:checked").value;
+    const renderPayload = { mode: selectedMode };
+    if (selectedMode === "nearby") {
+      renderPayload.searchBefore = Number(searchBefore.value);
+      renderPayload.searchAfter = Number(searchAfter.value);
+    }
     await fetchJson("/api/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: selectedMode }),
+      body: JSON.stringify(renderPayload),
     });
     setActiveView("source");
     await refreshState();

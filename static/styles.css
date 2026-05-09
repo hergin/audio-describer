@@ -252,7 +252,7 @@ video {
 
 .mode-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
@@ -429,5 +429,9 @@ textarea {
 
   .cue-list {
     max-height: none;
+  }
+
+  .mode-options {
+    grid-template-columns: 1fr;
   }
 }

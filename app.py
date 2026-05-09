@@ -14,6 +14,7 @@ from build_audio_described_video import (
     build_video,
     seconds_to_timestamp,
 )
+from build_smart_ad_video import build_smart_ad_video
 from mix_ad_into_original_audio import build_mixed_ad_video
 
 
@@ -218,8 +219,8 @@ def api_export_vtt():
 def api_render():
     payload = request.get_json(silent=True) or {}
     render_mode = payload.get("mode", "extended")
-    if render_mode not in {"extended", "mixed"}:
-        return jsonify({"error": "Choose either extended or mixed AD output."}), 400
+    if render_mode not in {"extended", "mixed", "smart"}:
+        return jsonify({"error": "Choose extended, mixed, or smart AD output."}), 400
 
     with state.lock:
         if state.status == "running":
@@ -234,7 +235,17 @@ def api_render():
         return jsonify({"error": "Add at least one audio description cue."}), 400
 
     write_vtt(cues, VTT_PATH)
-    output_suffix = "extended-ad" if render_mode == "extended" else "mixed-ad"
+    output_suffixes = {
+        "extended": "extended-ad",
+        "mixed": "mixed-ad",
+        "smart": "smart-ad",
+    }
+    status_messages = {
+        "extended": "Extended AD render started",
+        "mixed": "Mixed AD render started",
+        "smart": "Smart AD render started",
+    }
+    output_suffix = output_suffixes[render_mode]
     output_path = OUTPUT_DIR / f"{video_path.stem}-{output_suffix}.mp4"
     output_path.unlink(missing_ok=True)
     job_id = str(uuid4())
@@ -242,7 +253,7 @@ def api_render():
     with state.lock:
         state.job_id = job_id
         state.status = "running"
-        state.message = "Extended AD render started" if render_mode == "extended" else "Mixed AD render started"
+        state.message = status_messages[render_mode]
         state.output_path = output_path
         state.logs = [state.message]
 
@@ -270,6 +281,16 @@ def render_worker(
                 vtt_path=vtt_path,
                 output_path=output_path,
                 work_dir=GUI_WORKSPACE / f"render_{job_id}",
+                keep_temp=False,
+            )
+        elif render_mode == "smart":
+            set_job_status("running", "Detecting silence and rendering smart AD video")
+            build_smart_ad_video(
+                video_path=video_path,
+                vtt_path=vtt_path,
+                output_path=output_path,
+                work_dir=GUI_WORKSPACE / f"render_{job_id}",
+                bitrate_kbps=None,
                 keep_temp=False,
             )
         else:

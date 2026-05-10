@@ -1,3 +1,4 @@
 edge-tts
 Flask
 imageio-ffmpeg
+PySide6

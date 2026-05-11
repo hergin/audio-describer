@@ -307,13 +307,20 @@ class MainWindow(QMainWindow):
         cue_btns.addWidget(self.add_cue_btn)
         cue_btns.addWidget(self.save_cue_btn)
         rl.addLayout(cue_btns)
+        self.cue_text.setEnabled(False)
+        self.add_cue_btn.setEnabled(False)
+        self.save_cue_btn.setEnabled(False)
 
         # ── Cue list ──
         rl.addWidget(self._separator())
         cue_header = QHBoxLayout()
         cue_header.addWidget(self._section("Cues"))
         cue_header.addStretch()
+        self.save_cues_btn = self._btn("Save", "ghost")
+        self.load_cues_btn = self._btn("Load", "ghost")
         self.export_btn = self._btn("Export VTT", "ghost")
+        cue_header.addWidget(self.save_cues_btn)
+        cue_header.addWidget(self.load_cues_btn)
         cue_header.addWidget(self.export_btn)
         rl.addLayout(cue_header)
 
@@ -415,6 +422,8 @@ class MainWindow(QMainWindow):
         self.add_cue_btn.clicked.connect(self._pause_and_add)
         self.save_cue_btn.clicked.connect(self._save_cue)
         self.export_btn.clicked.connect(self._export_vtt)
+        self.save_cues_btn.clicked.connect(self._save_cues_file)
+        self.load_cues_btn.clicked.connect(self._load_cues_file)
         self.locate_btn.clicked.connect(self._locate_output)
         self.src_btn.clicked.connect(lambda: self._switch_view("source"))
         self.out_btn.clicked.connect(lambda: self._switch_view("output"))
@@ -428,7 +437,6 @@ class MainWindow(QMainWindow):
         self.source_player.playbackStateChanged.connect(self._on_playback_state)
         self.output_player.playbackStateChanged.connect(self._on_playback_state)
 
-        self.cues = read_cues()
         self._rebuild_cues()
 
     def _btn(self, text, style):
@@ -533,12 +541,12 @@ class MainWindow(QMainWindow):
         self.video_path = Path(path)
         self.source_player.setSource(QUrl.fromLocalFile(path))
         self.source_player.play()
-        self.cues = []
         self.editing_id = None
-        save_cues(self.cues)
         self._rebuild_cues()
-        self.cue_text.clear()
         self._switch_view("source")
+        self.cue_text.setEnabled(True)
+        self.add_cue_btn.setEnabled(True)
+        self.save_cue_btn.setEnabled(True)
         self.status.setText("Video loaded")
 
     def _pause_and_add(self):
@@ -632,6 +640,31 @@ class MainWindow(QMainWindow):
             write_vtt(self.cues, Path(p))
             self.status.setText("VTT exported")
 
+    def _save_cues_file(self):
+        if not self.cues:
+            QMessageBox.warning(self, "Save Cues", "No cues to save.")
+            return
+        p, _ = QFileDialog.getSaveFileName(self, "Save Cues", "cues.json", "JSON (*.json)")
+        if p:
+            Path(p).write_text(json.dumps(self.cues, indent=2), encoding="utf-8")
+            self.status.setText("Cues saved")
+
+    def _load_cues_file(self):
+        p, _ = QFileDialog.getOpenFileName(self, "Load Cues", "", "JSON (*.json)")
+        if not p:
+            return
+        try:
+            loaded = json.loads(Path(p).read_text(encoding="utf-8"))
+            if not isinstance(loaded, list):
+                raise ValueError("Expected a list of cues")
+            self.cues = loaded
+            self.cues.sort(key=lambda c: c["start"])
+            save_cues(self.cues)
+            self._rebuild_cues()
+            self.status.setText(f"Loaded {len(self.cues)} cues")
+        except Exception as e:
+            QMessageBox.warning(self, "Load Cues", f"Failed to load: {e}")
+
     def _locate_output(self):
         if not self.output_path or not self.output_path.exists():
             return
@@ -716,6 +749,9 @@ class MainWindow(QMainWindow):
         self.cue_time_lbl.setText("at 00:00:00.000")
         self.status.setText("Ready")
         self._set_badge("idle")
+        self.cue_text.setEnabled(False)
+        self.add_cue_btn.setEnabled(False)
+        self.save_cue_btn.setEnabled(False)
         self.log.clear()
         self.out_btn.setEnabled(False)
         self.locate_btn.setVisible(False)

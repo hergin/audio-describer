@@ -123,7 +123,7 @@ def parse_vtt(path: Path) -> list[Cue]:
 
 def run_ffmpeg(args: list[str], *, quiet: bool = False) -> subprocess.CompletedProcess:
     if not quiet:
-        print("ffmpeg", " ".join(args))
+        print("Processing audio/video...")
     try:
         return subprocess.run(
             [imageio_ffmpeg.get_ffmpeg_exe(), *args],
@@ -198,7 +198,7 @@ async def synthesize_tts(cues: list[Cue], tts_dir: Path) -> list[Path]:
     paths: list[Path] = []
     for cue in cues:
         mp3_path = tts_dir / f"cue_{cue.index:03d}.mp3"
-        print(f"TTS cue {cue.index}: {cue.text}")
+        print(f"Generating speech for cue {cue.index}...")
         try:
             await edge_tts.Communicate(cue.text, VOICE).save(str(mp3_path))
         except Exception as exc:
@@ -397,7 +397,7 @@ def validate_inputs(video_path: Path, vtt_path: Path, output_path: Path, work_di
         raise UserFacingError("Work directory must not be the same path as an input or output file.")
 
     if vtt_path.suffix.lower() not in {".vtt", ".txt"}:
-        print(f"Warning: VTT file extension is '{vtt_path.suffix}', expected .vtt or .txt.")
+        pass  # non-standard extension, but proceed anyway
 
     output_parent = output_path.parent
     if not output_parent.exists():
@@ -439,8 +439,7 @@ def build_video(
     fps = float(metadata["fps"])
     target_bitrate = bitrate_kbps or int(metadata["video_bitrate_kbps"]) or DEFAULT_VIDEO_BITRATE_KBPS
 
-    print(json.dumps({**metadata, "target_video_bitrate_kbps": target_bitrate}, indent=2))
-    print(f"Parsed {len(cues)} cue(s).")
+    print(f"Found {len(cues)} description(s)")
 
     try:
         if work_dir.exists():
@@ -465,7 +464,7 @@ def build_video(
 
     for cue, mp3_path in zip(cues, mp3_paths):
         if cue.start > source_duration:
-            print(f"Skipping cue {cue.index}; start is beyond the source video duration.")
+            print(f"Cue {cue.index} is past the end of the video, skipping")
             continue
 
         cue_audio_path = audio_dir / f"cue_{cue.index:03d}.m4a"
@@ -505,16 +504,15 @@ def build_video(
 
     concat_segments(segment_paths, output_path)
     output_duration = media_duration(output_path)
-    print(f"Done: {output_path}")
-    print(f"Source duration: {source_duration:.3f}s")
-    print(f"Output duration: {output_duration:.3f}s")
-    print(f"Added duration: {output_duration - source_duration:.3f}s")
+    print("Render finished!")
+    print(f"Original length: {source_duration:.1f}s")
+    print(f"Output length: {output_duration:.1f}s")
+    print(f"Added: {output_duration - source_duration:.1f}s")
 
     if keep_temp:
-        print(f"Temporary files kept in: {work_dir}")
+        pass
     else:
         shutil.rmtree(work_dir, ignore_errors=True)
-        print(f"Removed temporary files: {work_dir}")
 
 
 def main() -> None:

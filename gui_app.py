@@ -706,9 +706,15 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _on_status(self, st, msg):
-        self.status.setText(msg)
+        if st == "failed" and "\n" in msg:
+            # Traceback — show only the last line in the status bar
+            short = msg.strip().splitlines()[-1]
+            self.status.setText(short)
+            self.log.appendPlainText(f"Error: {short}")
+        else:
+            self.status.setText(msg)
+            self.log.appendPlainText(msg)
         self._set_badge(st)
-        self.log.appendPlainText(msg)
 
     def _on_done(self):
         self.render_btn.setEnabled(True)

@@ -35,7 +35,7 @@ async def synthesize_cues(cues, output_dir: Path) -> list[Path]:
     paths = []
     for cue in cues:
         path = output_dir / f"cue_{cue.index:03d}.mp3"
-        print(f"TTS cue {cue.index}: {cue.text}")
+        print(f"Generating speech for cue {cue.index}...")
         try:
             await edge_tts.Communicate(cue.text, VOICE).save(str(path))
         except Exception as exc:
@@ -166,7 +166,7 @@ def main() -> None:
     except UserFacingError as exc:
         sys.exit(f"Error: {exc}")
 
-    print(f"Done: {output_path}")
+    print("Render finished!")
 
 
 if __name__ == "__main__":

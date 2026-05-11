@@ -314,14 +314,14 @@ def build_smart_ad_video(
 
     try:
         spans = detect_silence(video_path, source_duration)
-        print(f"Detected {len(spans)} silent span(s).")
+        print(f"Found {len(spans)} silent gap(s) in audio")
 
         mp3_paths = asyncio.run(synthesize_tts(cues, tts_dir))
 
         plans: list[CuePlan] = []
         for cue, mp3_path in zip(cues, mp3_paths):
             if cue.start > source_duration:
-                print(f"Skipping cue {cue.index}; start is beyond the source video duration.")
+                print(f"Cue {cue.index} is past the end of the video, skipping")
                 continue
 
             cue_audio_path = audio_dir / f"cue_{cue.index:03d}.m4a"
@@ -346,22 +346,21 @@ def build_smart_ad_video(
                     requested_start=cue.start,
                 )
             )
-            print(
-                f"Cue {cue.index}: requested {cue.start:.3f}s, placed {cue_start:.3f}s, "
-                f"AD {ad_duration:.3f}s, silence {available_silence:.3f}s, pause {pause_duration:.3f}s"
-            )
+            if pause_duration > 0.001:
+                print(f"Cue {cue.index}: placed at {cue_start:.1f}s (pauses {pause_duration:.1f}s)")
+            else:
+                print(f"Cue {cue.index}: placed at {cue_start:.1f}s (fits in silence)")
 
         segment_paths: list[Path] = []
         previous_source_time = 0.0
 
         if plans and all(plan.pause_duration <= 0.001 for plan in plans):
-            print("No pause needed; copying video stream and mixing AD into the original audio.")
+            print("No pauses needed — mixing audio directly")
             make_no_pause_smart_output(video_path, plans, output_path, source_duration)
             output_duration = media_duration(output_path)
-            print(f"Done: {output_path}")
-            print(f"Source duration: {source_duration:.3f}s")
-            print(f"Output duration: {output_duration:.3f}s")
-            print(f"Added duration: {output_duration - source_duration:.3f}s")
+            print("Render finished!")
+            print(f"Original length: {source_duration:.1f}s")
+            print(f"Output length: {output_duration:.1f}s")
             return
 
         for plan in plans:
@@ -427,16 +426,13 @@ def build_smart_ad_video(
 
         concat_segments(segment_paths, output_path)
         output_duration = media_duration(output_path)
-        print(f"Done: {output_path}")
-        print(f"Source duration: {source_duration:.3f}s")
-        print(f"Output duration: {output_duration:.3f}s")
-        print(f"Added duration: {output_duration - source_duration:.3f}s")
+        print("Render finished!")
+        print(f"Original length: {source_duration:.1f}s")
+        print(f"Output length: {output_duration:.1f}s")
+        print(f"Added: {output_duration - source_duration:.1f}s")
     finally:
-        if keep_temp:
-            print(f"Temporary files kept in: {work_dir}")
-        else:
+        if not keep_temp:
             shutil.rmtree(work_dir, ignore_errors=True)
-            print(f"Removed temporary files: {work_dir}")
 
 
 def main() -> None:

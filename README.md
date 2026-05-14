@@ -60,19 +60,14 @@ python build_audio_described_video.py --keep-temp
 With the virtual environment activated:
 
 ```powershell
-python app.py
-```
-
-Then open:
-
-```text
-http://127.0.0.1:8000
+python gui_app.py
 ```
 
 The GUI lets you select a video, preview it, add audio-description cues at the current playback time, export those cues as WebVTT, and render the final described MP4. Uploaded videos, cue data, and completed GUI outputs are stored under `_gui_workspace`.
 
 ## Notes
 
+- Tested with Python 3.11 (should work with later versions as well).
 - Keep the terminal open while the script runs; generating TTS and re-encoding 1080p video can take a while.
 - The script uses `imageio-ffmpeg` to find the bundled ffmpeg binary automatically.
 - Intermediate TTS, audio, frame, and segment files are written to `_ad_build` while the script runs, then removed after a successful output unless `--keep-temp` is used.

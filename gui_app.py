@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from build_audio_described_video import UserFacingError, build_video, seconds_to_timestamp
+from build_audio_described_video import UserFacingError, build_video, seconds_to_timestamp, parse_vtt
 from build_nearby_silence_ad_video import build_nearby_silence_ad_video
 from build_smart_ad_video import build_smart_ad_video
 from mix_ad_into_original_audio import build_mixed_ad_video
@@ -318,9 +318,11 @@ class MainWindow(QMainWindow):
         cue_header.addStretch()
         self.save_cues_btn = self._btn("Save", "ghost")
         self.load_cues_btn = self._btn("Load", "ghost")
+        self.load_cues_vtt_btn = self._btn("Load VTT", "ghost")
         self.export_btn = self._btn("Export VTT", "ghost")
         cue_header.addWidget(self.save_cues_btn)
         cue_header.addWidget(self.load_cues_btn)
+        cue_header.addWidget(self.load_cues_vtt_btn)
         cue_header.addWidget(self.export_btn)
         rl.addLayout(cue_header)
 
@@ -424,6 +426,7 @@ class MainWindow(QMainWindow):
         self.export_btn.clicked.connect(self._export_vtt)
         self.save_cues_btn.clicked.connect(self._save_cues_file)
         self.load_cues_btn.clicked.connect(self._load_cues_file)
+        self.load_cues_vtt_btn.clicked.connect(self._load_cues_file_vtt)
         self.locate_btn.clicked.connect(self._locate_output)
         self.src_btn.clicked.connect(lambda: self._switch_view("source"))
         self.out_btn.clicked.connect(lambda: self._switch_view("output"))
@@ -658,6 +661,24 @@ class MainWindow(QMainWindow):
             if not isinstance(loaded, list):
                 raise ValueError("Expected a list of cues")
             self.cues = loaded
+            self.cues.sort(key=lambda c: c["start"])
+            save_cues(self.cues)
+            self._rebuild_cues()
+            self.status.setText(f"Loaded {len(self.cues)} cues")
+        except Exception as e:
+            QMessageBox.warning(self, "Load Cues", f"Failed to load: {e}")
+
+    def _load_cues_file_vtt(self):
+        p, _ = QFileDialog.getOpenFileName(self, "Load Cues", "", "WebVTT (*.vtt), WebVTT (*.txt)")
+        if not p:
+            return
+        try:
+            cues = parse_vtt(Path(p))
+            if not cues:
+                raise UserFacingError(f"No cues found in: {vtt_path}")
+            cues = [{"id": str(uuid4()), "start": c.start, "end": c.end, "text": c.text} for c in cues]
+            print(cues)
+            self.cues = cues
             self.cues.sort(key=lambda c: c["start"])
             save_cues(self.cues)
             self._rebuild_cues()

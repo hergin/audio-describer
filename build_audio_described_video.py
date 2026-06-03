@@ -250,7 +250,7 @@ def extract_frame(video_path: Path, timestamp: float, output_path: Path) -> None
     )
 
 
-def video_encode_args(fps: float, bitrate_kbps: int) -> list[str]:
+def video_encode_args(fps: float, crf: int = 18) -> list[str]:
     fps_text = f"{fps:.6f}".rstrip("0").rstrip(".")
     keyint = max(1, int(round(fps * 2)))
     return [
@@ -262,12 +262,8 @@ def video_encode_args(fps: float, bitrate_kbps: int) -> list[str]:
         "slow",
         "-pix_fmt",
         "yuv420p",
-        "-b:v",
-        f"{bitrate_kbps}k",
-        "-maxrate",
-        f"{math.ceil(bitrate_kbps * 1.15)}k",
-        "-bufsize",
-        f"{bitrate_kbps * 2}k",
+        "-crf",
+        str(crf),
         "-x264-params",
         f"keyint={keyint}:min-keyint={keyint}:scenecut=0",
     ]
@@ -283,7 +279,6 @@ def make_original_segment(
     end: float,
     output_path: Path,
     fps: float,
-    bitrate_kbps: int,
 ) -> bool:
     duration = end - start
     if duration <= 0.001:
@@ -302,7 +297,7 @@ def make_original_segment(
             "0:v:0",
             "-map",
             "0:a:0?",
-            *video_encode_args(fps, bitrate_kbps),
+            *video_encode_args(fps),
             *audio_encode_args(),
             "-movflags",
             "+faststart",
@@ -320,7 +315,6 @@ def make_pause_segment(
     duration: float,
     output_path: Path,
     fps: float,
-    bitrate_kbps: int,
 ) -> None:
     run_ffmpeg(
         [
@@ -340,7 +334,7 @@ def make_pause_segment(
             "-map",
             "1:a:0",
             "-shortest",
-            *video_encode_args(fps, bitrate_kbps),
+            *video_encode_args(fps),
             *audio_encode_args(),
             "-movflags",
             "+faststart",
@@ -423,12 +417,10 @@ def build_video(
     vtt_path: Path,
     output_path: Path,
     work_dir: Path,
-    bitrate_kbps: int | None,
-    keep_temp: bool,
+    bitrate_kbps: int | None = None,
+    keep_temp: bool = False,
 ) -> None:
     validate_inputs(video_path, vtt_path, output_path, work_dir)
-    if bitrate_kbps is not None and bitrate_kbps <= 0:
-        raise UserFacingError("--video-bitrate-kbps must be a positive integer.")
 
     cues = parse_vtt(vtt_path)
     if not cues:
@@ -437,7 +429,6 @@ def build_video(
     metadata = probe_media(video_path)
     source_duration = float(metadata["duration"])
     fps = float(metadata["fps"])
-    target_bitrate = bitrate_kbps or int(metadata["video_bitrate_kbps"]) or DEFAULT_VIDEO_BITRATE_KBPS
 
     print(f"Found {len(cues)} description(s)")
 
@@ -478,7 +469,6 @@ def build_video(
             cue.start,
             original_path,
             fps,
-            target_bitrate,
         ):
             segment_paths.append(original_path)
 
@@ -486,7 +476,7 @@ def build_video(
         extract_frame(video_path, cue.start, frame_path)
 
         pause_path = segments_dir / f"{len(segment_paths):04d}_pause_cue_{cue.index:03d}.mp4"
-        make_pause_segment(frame_path, cue_audio_path, pause_duration, pause_path, fps, target_bitrate)
+        make_pause_segment(frame_path, cue_audio_path, pause_duration, pause_path, fps)
         segment_paths.append(pause_path)
 
         previous_source_time = cue.start
@@ -498,7 +488,6 @@ def build_video(
         source_duration,
         tail_path,
         fps,
-        target_bitrate,
     ):
         segment_paths.append(tail_path)
 

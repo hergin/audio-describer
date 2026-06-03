@@ -114,17 +114,17 @@ class RenderWorker(QThread):
             self.status_changed.emit("running", f"{self.mode.title()} AD render started")
             if self.mode == "extended":
                 build_video(self.video_path, self.vtt_path, self.output_path,
-                            self.work_dir, bitrate_kbps=None, keep_temp=False)
+                            self.work_dir)
             elif self.mode == "mixed":
                 build_mixed_ad_video(self.video_path, self.vtt_path, self.output_path,
-                                     self.work_dir, keep_temp=False)
+                                     self.work_dir)
             elif self.mode == "smart":
                 build_smart_ad_video(self.video_path, self.vtt_path, self.output_path,
-                                     self.work_dir, bitrate_kbps=None, keep_temp=False)
+                                     self.work_dir)
             elif self.mode == "nearby":
                 build_nearby_silence_ad_video(
                     self.video_path, self.vtt_path, self.output_path,
-                    self.work_dir, bitrate_kbps=None, keep_temp=False,
+                    self.work_dir,
                     search_before=self.search_before, search_after=self.search_after)
             self.final_status = "done"
             self.status_changed.emit("done", "Render complete")

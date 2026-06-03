@@ -10,7 +10,6 @@ from pathlib import Path
 import imageio_ffmpeg
 
 from build_audio_described_video import (
-    DEFAULT_VIDEO_BITRATE_KBPS,
     UserFacingError,
     audio_encode_args,
     concat_segments,
@@ -138,7 +137,6 @@ def make_continue_with_ad_segment(
     duration: float,
     output_path: Path,
     fps: float,
-    bitrate_kbps: int,
 ) -> None:
     if duration <= 0.001:
         return
@@ -167,7 +165,7 @@ def make_continue_with_ad_segment(
             "0:v:0",
             "-map",
             "[mixed]",
-            *video_encode_args(fps, bitrate_kbps),
+            *video_encode_args(fps),
             *audio_encode_args(),
             "-movflags",
             "+faststart",
@@ -185,7 +183,6 @@ def make_pause_overflow_segment(
     duration: float,
     output_path: Path,
     fps: float,
-    bitrate_kbps: int,
 ) -> None:
     if duration <= 0.001:
         return
@@ -211,7 +208,7 @@ def make_pause_overflow_segment(
             "0:v:0",
             "-map",
             "1:a:0",
-            *video_encode_args(fps, bitrate_kbps),
+            *video_encode_args(fps),
             *audio_encode_args(),
             "-movflags",
             "+faststart",
@@ -287,12 +284,10 @@ def build_smart_ad_video(
     vtt_path: Path,
     output_path: Path,
     work_dir: Path,
-    bitrate_kbps: int | None,
-    keep_temp: bool,
+    bitrate_kbps: int | None = None,
+    keep_temp: bool = False,
 ) -> None:
     validate_inputs(video_path, vtt_path, output_path, work_dir)
-    if bitrate_kbps is not None and bitrate_kbps <= 0:
-        raise UserFacingError("--video-bitrate-kbps must be a positive integer.")
 
     cues = parse_vtt(vtt_path)
     if not cues:
@@ -301,7 +296,6 @@ def build_smart_ad_video(
     metadata = probe_media(video_path)
     source_duration = float(metadata["duration"])
     fps = float(metadata["fps"])
-    target_bitrate = bitrate_kbps or int(metadata["video_bitrate_kbps"]) or DEFAULT_VIDEO_BITRATE_KBPS
 
     if work_dir.exists():
         shutil.rmtree(work_dir)
@@ -377,7 +371,7 @@ def build_smart_ad_video(
                 plan.cue_start,
                 source_path,
                 fps,
-                target_bitrate,
+
             ):
                 segment_paths.append(source_path)
 
@@ -390,7 +384,7 @@ def build_smart_ad_video(
                     plan.continue_duration,
                     continue_path,
                     fps,
-                    target_bitrate,
+    
                 )
                 segment_paths.append(continue_path)
 
@@ -407,7 +401,7 @@ def build_smart_ad_video(
                     plan.pause_duration,
                     pause_path,
                     fps,
-                    target_bitrate,
+    
                 )
                 segment_paths.append(pause_path)
 
@@ -420,7 +414,6 @@ def build_smart_ad_video(
             source_duration,
             tail_path,
             fps,
-            target_bitrate,
         ):
             segment_paths.append(tail_path)
 

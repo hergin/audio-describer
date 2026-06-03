@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from build_audio_described_video import (
-    DEFAULT_VIDEO_BITRATE_KBPS,
     UserFacingError,
     concat_segments,
     encode_mp3_to_segment_audio,
@@ -82,14 +81,12 @@ def build_nearby_silence_ad_video(
     vtt_path: Path,
     output_path: Path,
     work_dir: Path,
-    bitrate_kbps: int | None,
-    keep_temp: bool,
-    search_before: float,
-    search_after: float,
+    bitrate_kbps: int | None = None,
+    keep_temp: bool = False,
+    search_before: float = SEARCH_BEFORE_SECONDS,
+    search_after: float = SEARCH_AFTER_SECONDS,
 ) -> None:
     validate_inputs(video_path, vtt_path, output_path, work_dir)
-    if bitrate_kbps is not None and bitrate_kbps <= 0:
-        raise UserFacingError("--video-bitrate-kbps must be a positive integer.")
     if search_before < 0 or search_after < 0:
         raise UserFacingError("Search window values must be non-negative.")
 
@@ -100,7 +97,6 @@ def build_nearby_silence_ad_video(
     metadata = probe_media(video_path)
     source_duration = float(metadata["duration"])
     fps = float(metadata["fps"])
-    target_bitrate = bitrate_kbps or int(metadata["video_bitrate_kbps"]) or DEFAULT_VIDEO_BITRATE_KBPS
 
     if work_dir.exists():
         shutil.rmtree(work_dir)
@@ -176,7 +172,7 @@ def build_nearby_silence_ad_video(
                 plan.cue_start,
                 source_path,
                 fps,
-                target_bitrate,
+
             ):
                 segment_paths.append(source_path)
 
@@ -189,7 +185,7 @@ def build_nearby_silence_ad_video(
                     plan.continue_duration,
                     continue_path,
                     fps,
-                    target_bitrate,
+    
                 )
                 segment_paths.append(continue_path)
 
@@ -206,7 +202,7 @@ def build_nearby_silence_ad_video(
                     plan.pause_duration,
                     pause_path,
                     fps,
-                    target_bitrate,
+    
                 )
                 segment_paths.append(pause_path)
 
@@ -219,7 +215,6 @@ def build_nearby_silence_ad_video(
             source_duration,
             tail_path,
             fps,
-            target_bitrate,
         ):
             segment_paths.append(tail_path)
 

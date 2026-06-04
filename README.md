@@ -82,6 +82,26 @@ To keep intermediate files for troubleshooting:
 python build_audio_described_video.py --keep-temp
 ```
 
+## Running Tests
+
+End-to-end tests for the smart rendering pipeline live in `tests/`. With the virtual environment activated, run from this folder:
+
+```bash
+python -m unittest discover -s tests
+```
+
+These tests generate tiny synthetic videos on the fly (no sample files needed) and run the full ffmpeg pipeline — silence detection, segment building, and concatenation/audio mixing. The text-to-speech step is stubbed with fixed-length clips, so they run in a couple of seconds and require no network connection. They verify that:
+
+- the output is a valid, non-empty MP4,
+- the output duration is correct (extended when a description overflows into a pause, unchanged when it fits inside a silent gap), and
+- the video resolution and codecs (`h264`/`aac`, `yuv420p`) are preserved.
+
+To run a single test module verbosely:
+
+```bash
+python -m unittest tests.test_smart_e2e -v
+```
+
 ## Notes
 
 - Tested with Python 3.11 (should work with later versions as well).

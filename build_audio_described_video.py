@@ -193,18 +193,65 @@ def probe_media(path: Path) -> dict[str, float | int | str]:
     }
 
 
+TTS_MAX_ATTEMPTS = 3
+TTS_BACKOFF_SECONDS = 2.0
+
+
+def _is_forbidden(exc: Exception) -> bool:
+    # edge-tts raises aiohttp.WSServerHandshakeError (which carries .status) when
+    # Microsoft rejects the request. A 403 is deterministic (usually an outdated
+    # edge-tts) and will not recover on retry.
+    return getattr(exc, "status", None) == 403 or "403" in str(exc)
+
+
+def _tts_error_message(cue_index: int, exc: Exception | None) -> str:
+    detail = f"{type(exc).__name__}: {exc}" if exc else "unknown error"
+    hint = ""
+    if exc is not None and _is_forbidden(exc):
+        hint = (
+            "\nMicrosoft's TTS service rejected the request (HTTP 403). This usually "
+            "means the edge-tts package is out of date. Update it with:\n"
+            "    pip install -U edge-tts"
+        )
+    return (
+        f"Could not generate TTS for cue {cue_index} after {TTS_MAX_ATTEMPTS} attempt(s)."
+        f"\nDetails: {detail}{hint}"
+        "\nSee the \"Troubleshooting\" section of README.md for how to fix this."
+    )
+
+
+async def save_tts(text: str, voice: str, out_path: Path, cue_index: int) -> None:
+    """Synthesize one cue to out_path, retrying transient failures with backoff.
+
+    A 403 (usually an outdated edge-tts) is treated as fatal and surfaced
+    immediately with guidance instead of being retried.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, TTS_MAX_ATTEMPTS + 1):
+        try:
+            await edge_tts.Communicate(text, voice).save(str(out_path))
+            return
+        except Exception as exc:
+            last_exc = exc
+            if _is_forbidden(exc):
+                break
+            if attempt < TTS_MAX_ATTEMPTS:
+                delay = TTS_BACKOFF_SECONDS * (2 ** (attempt - 1))
+                print(
+                    f"  Cue {cue_index} TTS attempt {attempt} failed "
+                    f"({type(exc).__name__}); retrying in {delay:.0f}s..."
+                )
+                await asyncio.sleep(delay)
+    raise UserFacingError(_tts_error_message(cue_index, last_exc)) from last_exc
+
+
 async def synthesize_tts(cues: list[Cue], tts_dir: Path) -> list[Path]:
     tts_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
     for cue in cues:
         mp3_path = tts_dir / f"cue_{cue.index:03d}.mp3"
         print(f"Generating speech for cue {cue.index}...")
-        try:
-            await edge_tts.Communicate(cue.text, VOICE).save(str(mp3_path))
-        except Exception as exc:
-            raise UserFacingError(
-                f"Could not generate TTS for cue {cue.index}. Check your internet connection and edge-tts setup."
-            ) from exc
+        await save_tts(cue.text, VOICE, mp3_path, cue.index)
         paths.append(mp3_path)
     return paths
 

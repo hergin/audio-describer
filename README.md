@@ -104,6 +104,43 @@ To run a single test module verbosely:
 python -m unittest tests.test_smart_e2e -v
 ```
 
+## Troubleshooting
+
+### TTS fails with "Could not generate TTS ..." or an HTTP 403
+
+Narration is generated with [`edge-tts`](https://pypi.org/project/edge-tts/), which calls
+Microsoft Edge's free online text-to-speech service. Microsoft periodically changes the
+security token that service expects, which makes **older `edge-tts` versions suddenly start
+failing** with an HTTP `403` error — even though your internet connection is fine. When this
+happens, every render dies at the first cue with a message like:
+
+```
+Could not generate TTS for cue 1 after 3 attempt(s).
+Details: WSServerHandshakeError: 403, message='Invalid response status'
+```
+
+**Fix: update `edge-tts`.** Activate the virtual environment first, then upgrade it.
+
+On Windows (PowerShell):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade edge-tts
+```
+
+On macOS / Linux:
+
+```bash
+source .venv/bin/activate
+python -m pip install --upgrade edge-tts
+```
+
+(Equivalently, `pip install -r requirements.txt` pulls a working version, because the
+requirement is pinned to a known-good minimum.)
+
+Then run the render again. This can recur whenever Microsoft rotates the token scheme; the fix
+is always the same — update `edge-tts`.
+
 ## Notes
 
 - Tested with Python 3.11 (should work with later versions as well).

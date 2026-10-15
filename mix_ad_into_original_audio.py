@@ -5,10 +5,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import edge_tts
 import imageio_ffmpeg
 
-from build_audio_described_video import UserFacingError, parse_vtt, probe_media
+from build_audio_described_video import UserFacingError, parse_vtt, probe_media, save_tts
 
 
 VOICE = "en-US-AriaNeural"
@@ -36,10 +35,7 @@ async def synthesize_cues(cues, output_dir: Path) -> list[Path]:
     for cue in cues:
         path = output_dir / f"cue_{cue.index:03d}.mp3"
         print(f"Generating speech for cue {cue.index}...")
-        try:
-            await edge_tts.Communicate(cue.text, VOICE).save(str(path))
-        except Exception as exc:
-            raise UserFacingError(f"Could not generate TTS for cue {cue.index}.") from exc
+        await save_tts(cue.text, VOICE, path, cue.index)
         paths.append(path)
     return paths
 

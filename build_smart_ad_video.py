@@ -313,6 +313,7 @@ def build_smart_ad_video(
         mp3_paths = asyncio.run(synthesize_tts(cues, tts_dir))
 
         plans: list[CuePlan] = []
+        placement_floor = 0.0  # earliest source time the next cue may occupy
         for cue, mp3_path in zip(cues, mp3_paths):
             if cue.start > source_duration:
                 print(f"Cue {cue.index} is past the end of the video, skipping")
@@ -327,8 +328,16 @@ def build_smart_ad_video(
                 spans,
                 source_duration,
             )
+            # Smart mode may shift a cue earlier to fit its narration into silence,
+            # but it must not back into territory a previous cue already consumed.
+            # Clamp the start to the running floor; any narration that no longer
+            # fits the remaining silence falls through to an overflow pause below.
+            if cue_start < placement_floor:
+                cue_start = min(placement_floor, source_duration)
+                available_silence = silence_available_from(cue_start, spans, source_duration)
             continue_duration = min(ad_duration, available_silence, max(0.0, source_duration - cue_start))
             pause_duration = max(0.0, ad_duration - continue_duration)
+            placement_floor = cue_start + continue_duration
             plans.append(
                 CuePlan(
                     cue_index=cue.index,
@@ -358,11 +367,10 @@ def build_smart_ad_video(
             return
 
         for plan in plans:
+            # Placement floors every cue past the previous cue's segment, so cues
+            # can no longer overlap. Clamp defensively in case placement changes.
             if plan.cue_start < previous_source_time:
-                raise UserFacingError(
-                    f"Cue {plan.cue_index} overlaps a previous smart AD segment. "
-                    "Move cues farther apart or use Extended AD mode."
-                )
+                previous_source_time = plan.cue_start
 
             source_path = segments_dir / f"{len(segment_paths):04d}_source_to_cue_{plan.cue_index:03d}.mp4"
             if make_original_segment(
